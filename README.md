@@ -1,289 +1,142 @@
-# Система автоматизации учебного процесса в T-FLEX DOCs
+# T-FLEX DOCs Educational Workflow Automation
 
-## 📋 Описание проекта
+Automation macros for T-FLEX DOCs that help instructors manage student onboarding and assignment distribution at scale.
 
-Решение для автоматизации работы преподавателей в системе T-FLEX DOCs, включающее два макроса для создания студенческих учетных записей и распределения индивидуальных заданий.
+## Project Overview
 
-## 🎯 Функциональность
+This repository contains two production-oriented C# macros:
 
-### Макрос 1: Создание учетных записей студентов (`Создание_Пользователей.cs`)
+1. **Student Account Provisioning** (`Создание_Пользователей.cs`)  
+   Imports student records from Excel/CSV/XML, creates or updates users, and writes generated passwords back to the source file.
+2. **Assignment Distribution** (`Распределение_Заданий.cs`)  
+   Distributes assignment variants across student folders with a collision-minimizing strategy and optional CAD export for `.grb` files.
 
-**Назначение:** Автоматическое создание пользователей в системе T-FLEX DOCs на основе списка из Excel/CSV/XML файла.
+The solution is designed for real classroom operations where hundreds of accounts and files must be handled consistently and quickly.
 
-#### Что делает макрос:
+## Key Features
 
-1. **Загрузка данных студентов**
-   - Читает файл Excel (.xlsx), CSV или XML со списком студентов
-   - Поддерживает автоопределение разделителей для CSV (`;`, `,`, табуляция)
-   - Извлекает: Фамилию, Имя, Отчество, Логин
+### 1. Student Account Provisioning
 
-2. **Создание группы**
-   - Находит в справочнике "Группы и пользователи" → "Студенты"
-   - Создает подгруппу с именем файла (например, "ИВТ-101")
+- Supports `.xlsx`, `.csv`, and `.xml` input files
+- Automatically creates (or reuses) a target student group
+- Creates new users and updates existing users by login
+- Generates random 5-digit PIN passwords
+- Builds short names in `Surname I.O.` format
+- Writes passwords back to the original input file
 
-3. **Создание пользователей**
-   - Для каждого студента создает учетную запись
-   - Генерирует случайный 5-значный PIN-код
-   - Формирует "Короткое имя" в формате "Фамилия И.О."
-   - Добавляет пользователей в созданную группу
-   - Если пользователь уже существует - обновляет его данные
+### 2. Assignment Distribution
 
-4. **Запись паролей**
-   - Записывает сгенерированные пароли обратно в исходный файл
-   - Добавляет колонку "Пароль" если её нет
-   - Снимает атрибут "только для чтения" при необходимости
+- Reads assignment sets from folder structure under `Задания`
+- Supports assignment file types: `.grb`, `.pdf`, `.tif`, `.tiff`
+- Restricts access to source assignment folders (teachers-only)
+- Uses multi-attempt randomized planning to minimize duplicate assignment combinations
+- Copies one variant from each work set to every student
+- Supports optional CAD export: `.grb -> .pdf` or `.tiff`
+- Produces a per-group distribution report
 
-#### Формат входного файла:
+## Repository Structure
 
-**Excel (.xlsx):**
-```
-№ | Фамилия | Имя      | Отчество    | Логин
-1 | Иванов  | Петр     | Сергеевич   | ivanov.ps
-2 | Петрова | Анна     | Ивановна    | petrova.ai
-```
+| File | Purpose |
+|---|---|
+| `Создание_Пользователей.cs` | Student import, group creation, user provisioning, password write-back |
+| `Распределение_Заданий.cs` | Assignment planning, security setup, file copy/export, reporting |
+| `Контора_Солнышек(1ver).pdf` / `.pptx` | Project materials (presentation and report) |
 
-**CSV (с разделителем `;` или `,`):**
-```
+## Input Data Format
+
+Required columns/fields:
+
+- `Фамилия` (Last Name)
+- `Имя` (First Name)
+- `Отчество` (Middle Name)
+- `Логин` (Login)
+
+Example CSV:
+
+```csv
 №;Фамилия;Имя;Отчество;Логин
 1;Иванов;Петр;Сергеевич;ivanov.ps
 2;Петрова;Анна;Ивановна;petrova.ai
 ```
 
-**XML:**
-```xml
-<data>
-  <record>
-    <Фамилия>Иванов</Фамилия>
-    <Имя>Петр</Имя>
-    <Отчество>Сергеевич</Отчество>
-    <Логин>ivanov.ps</Логин>
-  </record>
-</data>
-```
+## Expected Folder Layout
 
----
+Before distribution:
 
-### Макрос 2: Распределение заданий (`Распределение_Заданий.cs`)
-
-**Назначение:** Автоматическое распределение вариантов заданий студентам с минимизацией совпадений.
-
-#### Что делает макрос:
-
-1. **Поиск и анализ структуры**
-   - Находит папку "Задания" в корне справочника "Файлы"
-   - Находит папку "Студенты" с подпапками групп
-   - Загружает варианты заданий из подпапок типа "Работа 1", "Работа 2" и т.д.
-   - Поддерживает форматы: `.grb`, `.pdf`, `.tif`, `.tiff`
-
-2. **Ограничение доступа**
-   - Отключает наследование прав для папки "Задания"
-   - Устанавливает доступ только для группы "Преподаватели" с правами "Редакторский"
-   - Студенты не смогут видеть исходные задания
-
-3. **Интеллектуальное распределение**
-   - Использует алгоритм с перебором 32 вариантов распределения
-   - Минимизирует количество студентов с одинаковым набором вариантов
-   - Round-robin распределение для равномерного использования всех вариантов
-   - Случайное перемешивание для уникальности комбинаций
-
-4. **Копирование файлов**
-   - Создает папку "Задания" в личной папке каждого студента
-   - Копирует выбранные варианты с переименованием (например, "Работа 1.pdf")
-   - **CAD-экспорт (опционально):** конвертирует `.grb` → `.pdf` или `.tiff` через T-FLEX CAD
-
-5. **Генерация отчета**
-   - Выводит информацию по группам
-   - Показывает, какие варианты получил каждый студент
-
-#### Структура папок:
-
-**До работы макроса:**
-```
+```text
 Файлы/
 ├── Задания/
 │   ├── Работа 1/
-│   │   ├── вариант1.pdf
-│   │   ├── вариант2.pdf
-│   │   └── вариант3.pdf
 │   ├── Работа 2/
-│   │   ├── вариант1.grb
-│   │   └── вариант2.grb
-└── Студенты/
-    └── ИВТ-101/
-        ├── Иванов П.С./
-        └── Петрова А.И./
-```
-
-**После работы макроса:**
-```
-Файлы/
-└── Студенты/
-    └── ИВТ-101/
-        ├── Иванов П.С./
-        │   └── Задания/
-        │       ├── Работа 1.pdf       ← вариант2.pdf
-        │       └── Работа 2.pdf       ← вариант1.grb (экспортирован)
-        └── Петрова А.И./
-            └── Задания/
-                ├── Работа 1.pdf       ← вариант1.pdf
-                └── Работа 2.pdf       ← вариант2.grb (экспортирован)
-```
-
----
-
-## 🚀 Инструкция по использованию
-
-### Шаг 1: Подготовка списка студентов
-
-1. Создайте Excel/CSV/XML файл со списком студентов
-2. Обязательные колонки: `Фамилия`, `Имя`, `Отчество`, `Логин`
-3. Сохраните файл с названием группы (например, "ИВТ-101.xlsx")
-
-### Шаг 2: Создание учетных записей
-
-1. Откройте T-FLEX DOCs
-2. Убедитесь, что существует группа "Студенты" в справочнике "Группы и пользователи"
-3. Запустите макрос `Macro (1).cs`
-4. Выберите один из вариантов:
-   - **"Да"** - выбрать файл на локальном компьютере
-   - **"Нет"** - выбрать файл из справочника "Файлы" в T-FLEX DOCs
-5. Дождитесь завершения создания пользователей
-6. Откройте исходный файл - в нем появится колонка "Пароль" с паролями
-
-> **⚠️ Важно:** Сохраните файл с паролями! Это единственная копия учетных данных студентов.
-
-### Шаг 3: Создание структуры папок
-
-Вручную создайте следующую структуру в справочнике "Файлы":
-
-```
-Файлы/
-├── Задания/
-│   ├── Работа 1/     ← папка с вариантами 1-го задания
-│   ├── Работа 2/     ← папка с вариантами 2-го задания
 │   └── ...
+└── Студенты/
+    └── <GroupName>/
+        ├── <Student 1>/
+        ├── <Student 2>/
+        └── ...
 ```
 
-### Шаг 4: Загрузка вариантов заданий
+After distribution (inside each student folder):
 
-1. В каждую папку "Работа N" загрузите файлы с вариантами
-2. Название файлов может быть любым (например: "вариант1.pdf", "в1.grb")
-3. Количество вариантов произвольное (макрос распределит их равномерно)
-
-### Шаг 5: Распределение заданий
-
-1. Убедитесь, что существует группа "Преподаватели" в справочнике "Группы и пользователи"
-2. Убедитесь, что существует группа прав доступа "Редакторский"
-3. Запустите макрос `Macro (2).cs`:
-   - Метод `Run()` - обычное копирование файлов
-   - Метод `RunWithCADExport()` - с экспортом `.grb` → `.pdf`/`.tiff`
-4. Дождитесь завершения - появится отчет о распределении
-5. Проверьте папки студентов - в них появятся подпапки "Задания" с вариантами
-
-### Пример отчета:
-
-```
-Группа: ИВТ-101
-  Иванов П.С.: Работа 1.pdf, Работа 2.pdf, Работа 3.tiff
-  Петрова А.И.: Работа 1.pdf, Работа 2.pdf, Работа 3.tiff
-  Сидоров А.В.: Работа 1.pdf, Работа 2.pdf, Работа 3.tiff
+```text
+Задания/
+├── Работа 1.pdf
+├── Работа 2.tiff
+└── ...
 ```
 
----
+## Setup Requirements
 
-## 🔧 Технические детали решения
+- T-FLEX DOCs with API-enabled macro runtime
+- .NET Framework 4.5+ compatible environment
+- Optional: T-FLEX CAD (required for `.grb` export mode)
 
-### Архитектура Макроса 1
+Required entities in T-FLEX DOCs:
 
-**Классы:**
-- `Macro` - основной класс, координирует процесс
-- `StudentFileReader` - чтение данных из файлов (Excel/CSV/XML)
-- `StudentFileWriter` - запись паролей обратно в файлы
-- `UserCreator` - создание пользователей в T-FLEX DOCs
-- `Student` - модель данных студента
-- `Utils` - вспомогательные методы
+- User group: `Студенты`
+- User group: `Преподаватели`
+- Access group: `Редакторский`
+- File reference root folders: `Задания`, `Студенты`
 
-**Ключевые технологии:**
-- `DocumentFormat.OpenXml` - работа с Excel файлами
-- `System.Xml.Linq` - парсинг XML
-- `TFlex.DOCs.Model.References.Users` - API для работы с пользователями
+## Usage
 
+### Step 1: Create Student Accounts
 
-### Архитектура Макроса 2
+1. Run macro from `Создание_Пользователей.cs`.
+2. Select a local file (`.xlsx/.csv/.xml`) or a file from the `Файлы` reference.
+3. Wait for completion.
+4. Keep the updated source file — it contains generated passwords.
 
-**Ключевые алгоритмы:**
+### Step 2: Distribute Assignments
 
-1. **Алгоритм распределения вариантов:**
-   - Перебирает 32 варианта распределения
-   - Для каждого студента формирует "сигнатуру" - последовательность номеров вариантов
-   - Выбирает распределение с минимальным количеством одинаковых сигнатур
-   - Использует жадный алгоритм: при выборе варианта для студента предпочитает вариант, который создаст наиболее уникальную сигнатуру
+1. Prepare assignment variants under `Файлы/Задания/Работа N`.
+2. Ensure student folders exist under `Файлы/Студенты/<GroupName>/`.
+3. Run:
+   - `Run()` for direct file copy
+   - `RunWithCADExport()` for `.grb` conversion + copy
+4. Review the generated report in macro output.
 
-2. **Round-robin с перемешиванием:**
-   - Вычисляет базовое количество использований каждого варианта: `baseCount = studentCount / fileCount`
-   - Остаток распределяет случайным образом
-   - Гарантирует, что все варианты используются примерно одинаково
+## Technical Notes
 
-3. **CAD-экспорт:**
-   - Скачивает `.grb` файл во временную папку
-   - Открывает через `CadDocumentProvider`
-   - Экспортирует в `.pdf` или `.tiff`
-   - Загружает результат в папку студента
-   - Очищает временные файлы
+- Assignment planning performs multiple randomized attempts and selects the plan with the fewest duplicate student signatures.
+- Access inheritance for the source `Задания` folder is disabled and replaced with explicit teacher access.
+- Password write-back supports XML, CSV, and Excel (OpenXML).
 
-**Ключевые технологии:**
-- `TFlex.DOCs.Model.References.Files` - работа с файлами и папками
-- `TFlex.DOCs.Model.Access` - управление правами доступа
-- `TFlex.DOCs.Model.FilePreview.CADService` - экспорт CAD-документов
+## Limitations
 
----
+- Assignment macro processes only `.grb`, `.pdf`, `.tif`, `.tiff` as assignment sources.
+- CAD export requires an active CAD document provider.
+- CSV parsing is delimiter-aware (`;`, `,`, tab) but assumes simple row structure.
 
-## 📦 Зависимости
+## Troubleshooting
 
-### Макрос 1:
-```
-DocumentFormat.OpenXml.dll
-DocumentFormat.OpenXml.Framework.dll
-System.Windows.Forms.dll
-System.Xml.Linq.dll
-WindowsBase.dll
-```
+| Issue | Resolution |
+|---|---|
+| `Не найдена группа 'Студенты'` | Create the `Студенты` group in user reference |
+| `Не найдена папка 'Задания'` | Create `Задания` in the root of `Файлы` |
+| CAD export is unavailable | Start T-FLEX CAD or run non-export mode (`Run`) |
+| Passwords were not written | Ensure the file is writable and not locked by another app |
 
-### Макрос 2:
-```
-TFlex.DOCs.Common.dll
-```
+## License
 
----
-
-
-## ⚠️ Требования и ограничения
-
-### Системные требования:
-- T-FLEX DOCs (версия с поддержкой API)
-- T-FLEX CAD (опционально, для экспорта `.grb` файлов)
-- .NET Framework 4.5+
-
-### Обязательная предварительная настройка T-FLEX DOCs:
-1. Группа "Студенты" в справочнике "Группы и пользователи"
-2. Группа "Преподаватели" в справочнике "Группы и пользователи"
-3. Группа прав доступа "Редакторский"
-4. Справочник "Файлы" с папками "Задания" и "Студенты"
-
-### Ограничения:
-- Макрос 2 работает только с файлами `.grb`, `.pdf`, `.tif`, `.tiff`
-- CAD-экспорт требует запущенный T-FLEX CAD
-
----
-
-## 🐛 Устранение проблем
-
-| Проблема | Решение |
-|----------|---------|
-| "Не найдена группа 'Студенты'" | Создайте группу "Студенты" в справочнике "Группы и пользователи" |
-| "Не найдена папка 'Задания'" | Создайте папку "Задания" в корне справочника "Файлы" |
-| "CAD-документ провайдер не активен" | Запустите T-FLEX CAD или используйте метод `Run()` вместо `RunWithCADExport()` |
-| Пароли не записались в файл | Проверьте, что файл не открыт в другой программе и не имеет атрибута "только для чтения" |
-| Студент получил задания, но не видит их | Проверьте права доступа студента к своей папке |
-
----
+No explicit license file is currently provided in this repository.
